@@ -5,6 +5,7 @@ const path = require("path");
 const fs = require("fs");
 
 const app = express();
+const uploadDir = path.join(__dirname, "uploads");
 
 // 设置 body-parser 选项，增加请求体大小限制
 app.use(bodyParser.json({ limit: "50mb" })); // 允许最大 50MB 的 JSON 请求体
@@ -41,13 +42,12 @@ const storage = multer.diskStorage({
   // 上传的文件要存储到哪里
   destination: function (req, file, cb) {
     // 上传的文件夹路径，需要在项目根目录下创建 uploads 子文件夹
-    const uploadDir = path.join(__dirname, "uploads");
     // 如果 uploads 子文件夹不存在，则创建它
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir);
     }
     // 上传的文件夹路径
-    cb(null, "uploads");
+    cb(null, uploadDir);
   },
   // 上传的文件名字如何命名
   filename: function (req, file, cb) {
@@ -75,8 +75,12 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
 });
 
 // 提供静态资源服务
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadDir));
 
-app.listen(3001, () => {
-  console.log("server is running at 3001");
-});
+if (require.main === module) {
+  app.listen(3001, () => {
+    console.log("server is running at 3001");
+  });
+}
+
+module.exports = { app, uploadDir };
