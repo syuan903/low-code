@@ -10,14 +10,23 @@ const app = express();
 app.use(bodyParser.json({ limit: "50mb" })); // 允许最大 50MB 的 JSON 请求体
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true })); // 允许最大 50MB 的 URL 编码请求体
 
-let quizzes = {}; // 存储问题
-let answers = {}; // 存储答案
+const state = {
+  quizzes: {}, // 存储问题
+  answers: {}, // 存储答案
+};
+
+const uploadDir = path.join(__dirname, "uploads");
+
+function resetState() {
+  state.quizzes = {};
+  state.answers = {};
+}
 
 // 针对在线答题功能，提供3个新的接口
 // 存储问卷
 app.post("/api/saveQuiz", (req, res) => {
   const { id, quizData } = req.body;
-  quizzes[id] = quizData;
+  state.quizzes[id] = quizData;
   res.status(200).send({ message: "Quiz saved" });
 });
 // 根据id获取问卷内容
@@ -25,14 +34,22 @@ app.get("/api/getQuiz/:id", (req, res) => {
   // 本来正常的逻辑，这里应该根据前端传递过来的问卷 id，从数据库来获取问卷内容，然后返回给前端
   // 但是这是一个简化项目，没有数据库，使用的是 indexedDB 来存储的问卷数据
   // 因此有了saveQuiz这个接口，我们可以直接从内存中获取问卷数据
-  const quizData = quizzes[req.params.id];
+  const quizData = state.quizzes[req.params.id];
   res.status(200).send(quizData);
 });
 // 存储答案
 app.post("/api/submitAnswers", (req, res) => {
   const { quizId, answers: userAnswers } = req.body;
-  answers[quizId] = userAnswers;
-  console.table(answers);
+  if (quizId === undefined || quizId === null) {
+    res.status(400).send({ message: "quizId is required" });
+    return;
+  }
+
+  if (!state.answers[quizId]) {
+    state.answers[quizId] = [];
+  }
+  state.answers[quizId].push(userAnswers);
+  console.table(state.answers);
   res.status(200).send({ message: "Answers submitted" });
 });
 
@@ -41,13 +58,12 @@ const storage = multer.diskStorage({
   // 上传的文件要存储到哪里
   destination: function (req, file, cb) {
     // 上传的文件夹路径，需要在项目根目录下创建 uploads 子文件夹
-    const uploadDir = path.join(__dirname, "uploads");
     // 如果 uploads 子文件夹不存在，则创建它
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir);
     }
     // 上传的文件夹路径
-    cb(null, "uploads");
+    cb(null, uploadDir);
   },
   // 上传的文件名字如何命名
   filename: function (req, file, cb) {
@@ -75,8 +91,12 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
 });
 
 // 提供静态资源服务
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadDir));
 
-app.listen(3001, () => {
-  console.log("server is running at 3001");
-});
+if (require.main === module) {
+  app.listen(3001, () => {
+    console.log("server is running at 3001");
+  });
+}
+
+module.exports = { app, state, resetState, uploadDir };
