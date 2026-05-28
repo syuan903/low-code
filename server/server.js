@@ -12,6 +12,8 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true })); // 允许最�
 
 let quizzes = {}; // 存储问题
 let answers = {}; // 存储答案
+app.locals.quizzes = quizzes;
+app.locals.answers = answers;
 
 // 针对在线答题功能，提供3个新的接口
 // 存储问卷
@@ -31,7 +33,10 @@ app.get("/api/getQuiz/:id", (req, res) => {
 // 存储答案
 app.post("/api/submitAnswers", (req, res) => {
   const { quizId, answers: userAnswers } = req.body;
-  answers[quizId] = userAnswers;
+  if (!answers[quizId]) {
+    answers[quizId] = [];
+  }
+  answers[quizId].push(userAnswers);
   console.table(answers);
   res.status(200).send({ message: "Answers submitted" });
 });
@@ -77,6 +82,10 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
 // 提供静态资源服务
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.listen(3001, () => {
-  console.log("server is running at 3001");
-});
+if (require.main === module) {
+  app.listen(3001, () => {
+    console.log("server is running at 3001");
+  });
+}
+
+module.exports = app;
