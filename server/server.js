@@ -3,8 +3,17 @@ const bodyParser = require("body-parser");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 
 const app = express();
+const PORT = process.env.PORT || 3001;
+const uploadDir = path.join(__dirname, "uploads");
+const allowedImageTypes = new Map([
+  ["image/jpeg", { extensions: new Set([".jpg", ".jpeg"]), storedExtension: ".jpg" }],
+  ["image/png", { extensions: new Set([".png"]), storedExtension: ".png" }],
+  ["image/gif", { extensions: new Set([".gif"]), storedExtension: ".gif" }],
+  ["image/webp", { extensions: new Set([".webp"]), storedExtension: ".webp" }],
+]);
 
 // 设置 body-parser 选项，增加请求体大小限制
 app.use(bodyParser.json({ limit: "50mb" })); // 允许最大 50MB 的 JSON 请求体
@@ -31,40 +40,52 @@ app.get("/api/getQuiz/:id", (req, res) => {
 // 存储答案
 app.post("/api/submitAnswers", (req, res) => {
   const { quizId, answers: userAnswers } = req.body;
-  answers[quizId] = userAnswers;
+  if (!quizId || userAnswers === undefined) {
+    return res.status(400).send({ message: "quizId and answers are required" });
+  }
+  if (!answers[quizId]) {
+    answers[quizId] = [];
+  }
+  answers[quizId].push(userAnswers);
   console.table(answers);
-  res.status(200).send({ message: "Answers submitted" });
+  res.status(200).send({ message: "Answers submitted", count: answers[quizId].length });
 });
 
 // 设置 multer 存储引擎
 const storage = multer.diskStorage({
   // 上传的文件要存储到哪里
   destination: function (req, file, cb) {
-    // 上传的文件夹路径，需要在项目根目录下创建 uploads 子文件夹
-    const uploadDir = path.join(__dirname, "uploads");
     // 如果 uploads 子文件夹不存在，则创建它
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir);
-    }
+    fs.mkdirSync(uploadDir, { recursive: true });
     // 上传的文件夹路径
-    cb(null, "uploads");
+    cb(null, uploadDir);
   },
   // 上传的文件名字如何命名
   filename: function (req, file, cb) {
     // 给上传的文件一个唯一的后缀来保证不重名
-    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(
-      null,
-      file.fieldname + "-" + uniqueSuffix + path.extname(file.originalname)
-    );
+    cb(null, `${file.fieldname}-${crypto.randomUUID()}${allowedImageTypes.get(file.mimetype).storedExtension}`);
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowedType = allowedImageTypes.get(file.mimetype);
+    if (!allowedType || !allowedType.extensions.has(ext)) {
+      return cb(new multer.MulterError("LIMIT_UNEXPECTED_FILE", "image"));
+    }
+    cb(null, true);
+  },
+});
 
 // 添加上传图片的路由接口
 app.post("/api/upload", upload.single("image"), (req, res) => {
   try {
+    if (!req.file) {
+      return res.status(400).send({ message: "请选择要上传的图片" });
+    }
     res.status(200).send({
       message: "图片上传成功",
       imageUrl: `/uploads/${req.file.filename}`,
@@ -75,8 +96,30 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
 });
 
 // 提供静态资源服务
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use(
+  "/uploads",
+  express.static(uploadDir, {
+    setHeaders: (res) => {
+      res.setHeader("X-Content-Type-Options", "nosniff");
+    },
+  })
+);
 
-app.listen(3001, () => {
-  console.log("server is running at 3001");
+app.use((error, req, res, next) => {
+  if (error instanceof multer.MulterError) {
+    return res.status(400).send({ message: "只支持上传 JPG、PNG、GIF 或 WebP 图片" });
+  }
+  next(error);
 });
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`server is running at ${PORT}`);
+  });
+}
+
+module.exports = {
+  app,
+  answers,
+  uploadDir,
+};
