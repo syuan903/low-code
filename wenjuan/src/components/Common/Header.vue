@@ -7,17 +7,17 @@
       <div class="center flex align-items-center space-between pl-15 pr-15">
         <div v-if="isEditor">
           <div v-if="id">
-            <el-button type="warning" size="small" @click="updateSurvey()"
+            <el-button type="warning" size="small" :disabled="isLoading" @click="updateSurvey()"
               >更新问卷</el-button
             >
           </div>
           <div v-else>
-            <el-button type="danger" size="small" @click="reset">重置问卷</el-button>
-            <el-button type="success" size="small" @click="saveSurvey">保存问卷</el-button>
+            <el-button type="danger" size="small" :disabled="isLoading" @click="reset">重置问卷</el-button>
+            <el-button type="success" size="small" :disabled="isLoading" @click="saveSurvey">保存问卷</el-button>
           </div>
         </div>
         <div v-if="isEditor">
-          <el-button type="primary" size="small" @click="preview">预览</el-button>
+          <el-button type="primary" size="small" :disabled="isLoading" @click="preview">预览</el-button>
         </div>
       </div>
       <div class="right flex justify-content-center align-items-center">
@@ -38,7 +38,8 @@ const store = useEditorStore();
 
 const props = defineProps<{
   isEditor: boolean,
-  id?: number
+  id?: number,
+  isLoading?: boolean
 }>()
 
 const goHome = () => {

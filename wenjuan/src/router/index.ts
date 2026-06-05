@@ -240,10 +240,12 @@ const router = createRouter({
 })
 
 router.beforeEach((to) => {
-  const activeView = localStorage.getItem('activeView') || 'home'
-  if (activeView === 'materials' && to.name) {
+  if (to.matched.some((record) => record.name === 'materials') && to.name) {
     const store = useMetarialStore()
-    store.setCurrentMaterialCom(to.name as string)
+    const comName = to.name as string
+    if (comName in store.coms) {
+      store.setCurrentMaterialCom(comName)
+    }
   }
 })
 
