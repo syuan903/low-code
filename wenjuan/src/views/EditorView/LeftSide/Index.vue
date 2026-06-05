@@ -35,13 +35,14 @@ import { useRoute, useRouter } from 'vue-router';
 const route = useRoute();
 const routeName = computed(() => route.name);
 const router = useRouter();
+const editorRouteParams = computed(() => (route.params.id ? { id: route.params.id } : {}));
 
 const switchEditor = () => {
-  router.push({ name: 'survey-type' });
+  router.push({ name: 'survey-type', params: editorRouteParams.value });
 };
 
 const switchOutline = () => {
-  router.push({ name: 'outline' });
+  router.push({ name: 'outline', params: editorRouteParams.value });
 };
 </script>
 
