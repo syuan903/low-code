@@ -257,8 +257,9 @@ export const useEditorStore = defineStore("editor", {
       this.currentComponentIndex = index;
     },
     removeCom(index: number) {
+      const removedCom = this.coms[index];
       this.coms.splice(index, 1);
-      if (isSurveyComName(this.coms[index]?.name)) {
+      if (removedCom && isSurveyComName(removedCom.name)) {
         this.surveyCount--;
       }
       this.currentComponentIndex = -1;

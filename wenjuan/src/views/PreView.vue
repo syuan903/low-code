@@ -6,7 +6,7 @@
         <!-- 左边按钮 -->
         <div class="flex space-between">
           <el-button type="danger" @click="gobackHandle">返回</el-button>
-          <el-button type="success" @click="genQuiz">生成在线问卷</el-button>
+          <el-button type="success" :loading="isGenerating" :disabled="isLoading" @click="genQuiz">生成在线问卷</el-button>
           <el-button type="warning" @click="genPDF">生成本地PDF</el-button>
         </div>
         <!-- 题目数量 -->
@@ -50,19 +50,30 @@ import { v4 as uuidv4 } from 'uuid';
 import { ElMessage } from 'element-plus';
 
 const dialogVisible = ref(false);
+const isLoading = ref(Boolean(route.params.id));
+const isGenerating = ref(false);
 
 // 获取路由参数
 const id = Number(route.params.id);
 // 接下来应该根据拿到的 id 去获取存储的问卷题目
 if (id) {
-  getSurveyById(id).then((res) => {
-    if (res) {
-      // 拿到数据后，组件部分需要重新还原
-      restoreComponentStatus(res.coms,componentMap);
-      // 还原完成之后，将还原的数据设置为仓库里面的 coms 即可
-      store.setStore(res as SurveyDBReturnData);
-    }
-  });
+  getSurveyById(id)
+    .then((res) => {
+      if (res) {
+        // 拿到数据后，组件部分需要重新还原
+        restoreComponentStatus(res.coms,componentMap);
+        // 还原完成之后，将还原的数据设置为仓库里面的 coms 即可
+        store.setStore(res as SurveyDBReturnData);
+      } else {
+        ElMessage.error('问卷不存在或已被删除');
+      }
+    })
+    .catch(() => {
+      ElMessage.error('问卷加载失败');
+    })
+    .finally(() => {
+      isLoading.value = false;
+    });
 }
 
 const serialNum = computed(() => useSurveyNums(store.coms).value);
@@ -97,26 +108,37 @@ const genPDF = () => {
 };
 
 // 生成在线问卷
-const genQuiz = () => {
+const genQuiz = async () => {
+  if (isLoading.value || isGenerating.value) return;
   // 1. 首先将问卷的数据传递到服务器端，服务器端存储到内存中
   const id = uuidv4();
-  // 将问卷内容和id传递给服务器
-  fetch('/api/saveQuiz', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      id,
-      quizData: {
-        coms: JSON.stringify(store.coms),
-        surveyCount: store.surveyCount,
+  isGenerating.value = true;
+  try {
+    // 将问卷内容和id传递给服务器
+    const response = await fetch('/api/saveQuiz', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    }),
-  });
-  // 2. 将弹出框显示出来
-  quizLink.value = `${window.location.origin}/quiz/${id}`;
-  dialogVisible.value = true;
+      body: JSON.stringify({
+        id,
+        quizData: {
+          coms: JSON.stringify(JSON.parse(JSON.stringify(store.coms))),
+          surveyCount: store.surveyCount,
+        },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('save quiz failed');
+    }
+    // 2. 将弹出框显示出来
+    quizLink.value = `${window.location.origin}/quiz/${id}`;
+    dialogVisible.value = true;
+  } catch {
+    ElMessage.error('在线问卷生成失败，请稍后再试');
+  } finally {
+    isGenerating.value = false;
+  }
 };
 
 // 复制在线答题的链接
