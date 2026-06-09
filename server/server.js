@@ -17,7 +17,21 @@ let answers = {}; // 存储答案
 // 存储问卷
 app.post("/api/saveQuiz", (req, res) => {
   const { id, quizData } = req.body;
-  quizzes[id] = quizData;
+  if (!id || typeof id !== "string" || !quizData || typeof quizData.coms !== "string") {
+    return res.status(400).send({ message: "Invalid quiz data" });
+  }
+  try {
+    const coms = JSON.parse(quizData.coms);
+    if (!Array.isArray(coms)) {
+      return res.status(400).send({ message: "Invalid quiz data" });
+    }
+  } catch (error) {
+    return res.status(400).send({ message: "Invalid quiz data" });
+  }
+  quizzes[id] = {
+    coms: quizData.coms,
+    surveyCount: Number(quizData.surveyCount) || 0,
+  };
   res.status(200).send({ message: "Quiz saved" });
 });
 // 根据id获取问卷内容
@@ -26,6 +40,9 @@ app.get("/api/getQuiz/:id", (req, res) => {
   // 但是这是一个简化项目，没有数据库，使用的是 indexedDB 来存储的问卷数据
   // 因此有了saveQuiz这个接口，我们可以直接从内存中获取问卷数据
   const quizData = quizzes[req.params.id];
+  if (!quizData) {
+    return res.status(404).send({ message: "Quiz not found" });
+  }
   res.status(200).send(quizData);
 });
 // 存储答案
@@ -36,18 +53,26 @@ app.post("/api/submitAnswers", (req, res) => {
   res.status(200).send({ message: "Answers submitted" });
 });
 
+const uploadDir = path.join(__dirname, "uploads");
+const allowedImageMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+]);
+const allowedImageExtensions = new Set([".jpg", ".jpeg", ".png", ".gif", ".webp"]);
+
 // 设置 multer 存储引擎
 const storage = multer.diskStorage({
   // 上传的文件要存储到哪里
   destination: function (req, file, cb) {
     // 上传的文件夹路径，需要在项目根目录下创建 uploads 子文件夹
-    const uploadDir = path.join(__dirname, "uploads");
     // 如果 uploads 子文件夹不存在，则创建它
     if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir);
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
     // 上传的文件夹路径
-    cb(null, "uploads");
+    cb(null, uploadDir);
   },
   // 上传的文件名字如何命名
   filename: function (req, file, cb) {
@@ -60,22 +85,44 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 2 * 1024 * 1024,
+  },
+  fileFilter: function (req, file, cb) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedImageMimeTypes.has(file.mimetype) && allowedImageExtensions.has(ext)) {
+      return cb(null, true);
+    }
+    cb(new Error("INVALID_FILE_TYPE"));
+  },
+});
 
 // 添加上传图片的路由接口
-app.post("/api/upload", upload.single("image"), (req, res) => {
-  try {
+app.post("/api/upload", (req, res) => {
+  upload.single("image")(req, res, (error) => {
+    if (error) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).send({ message: "图片大小不要超过2MB" });
+      }
+      if (error.message === "INVALID_FILE_TYPE") {
+        return res.status(400).send({ message: "只支持上传图片文件" });
+      }
+      return res.status(500).send({ message: "图片上传失败" });
+    }
+    if (!req.file) {
+      return res.status(400).send({ message: "请选择要上传的图片" });
+    }
     res.status(200).send({
       message: "图片上传成功",
       imageUrl: `/uploads/${req.file.filename}`,
     });
-  } catch (error) {
-    res.status(500).send({ message: "图片上传失败" });
-  }
+  });
 });
 
 // 提供静态资源服务
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadDir));
 
 app.listen(3001, () => {
   console.log("server is running at 3001");

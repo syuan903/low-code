@@ -7,17 +7,17 @@
       <div class="center flex align-items-center space-between pl-15 pr-15">
         <div v-if="isEditor">
           <div v-if="id">
-            <el-button type="warning" size="small" @click="updateSurvey()"
+            <el-button type="warning" size="small" :disabled="disabled" @click="updateSurvey()"
               >更新问卷</el-button
             >
           </div>
           <div v-else>
-            <el-button type="danger" size="small" @click="reset">重置问卷</el-button>
-            <el-button type="success" size="small" @click="saveSurvey">保存问卷</el-button>
+            <el-button type="danger" size="small" :disabled="disabled" @click="reset">重置问卷</el-button>
+            <el-button type="success" size="small" :disabled="disabled" @click="saveSurvey">保存问卷</el-button>
           </div>
         </div>
         <div v-if="isEditor">
-          <el-button type="primary" size="small" @click="preview">预览</el-button>
+          <el-button type="primary" size="small" :disabled="disabled" @click="preview">预览</el-button>
         </div>
       </div>
       <div class="right flex justify-content-center align-items-center">
@@ -38,7 +38,8 @@ const store = useEditorStore();
 
 const props = defineProps<{
   isEditor: boolean,
-  id?: number
+  id?: number,
+  disabled?: boolean
 }>()
 
 const goHome = () => {
@@ -52,6 +53,7 @@ const avatar = ref('https://wpimg.wallstcn.com/f778738c-e4f8-4870-b634-56703b4ac
 
 // 重置问卷
 const reset = () => {
+  if (props.disabled) return;
   ElMessageBox.confirm('确定要重置问卷吗？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -68,6 +70,7 @@ const reset = () => {
 
 // 保存问卷
 const saveSurvey = () => {
+  if (props.disabled) return;
   ElMessageBox.prompt('请输入问卷的标题', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -97,6 +100,7 @@ const saveSurvey = () => {
 };
 
 const updateSurvey = () => {
+  if (props.disabled) return;
   ElMessageBox.confirm('是否确定更新问卷', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -123,6 +127,7 @@ const updateSurvey = () => {
 
 // 预览问卷
 const preview = () => {
+  if (props.disabled) return;
   ElMessageBox.confirm('预览会自动保存问卷，是否跳转预览？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',

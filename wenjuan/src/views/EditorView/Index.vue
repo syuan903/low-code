@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="header">
-      <Header :isEditor="true" :id="Number(id)"/>
+      <Header :isEditor="true" :id="Number(id)" :disabled="isLoading"/>
     </div>
     <!-- 编辑器主体区域 -->
     <div class="container">
@@ -21,7 +21,7 @@ import Center from '@/views/EditorView/Center.vue';
 import RightSide from '@/views/EditorView/RightSide.vue';
 import { restoreComponentStatus } from '@/utils';
 import { componentMap } from '@/configs/compontentMap';
-import {computed} from 'vue';
+import {computed, ref, watch} from 'vue';
 import type { SurveyDBReturnData,EditorStore} from '@/types';
 import { useUpdateStatus } from "@/utils";
 
@@ -31,20 +31,42 @@ const route = useRoute();
 // 仓库
 import { useEditorStore } from '@/stores/useEditor';
 const store = useEditorStore()as unknown as EditorStore;
-store.resetComs();
 
 const currentCom = computed(() => store.coms[store.currentComponentIndex]);
 useUpdateStatus(store,currentCom)
 
 const id = computed(() => (route.params.id ? route.params.id : ''));
-if (id.value) {
-  store.getCurComs(Number(id.value)).then((res) => {
+const isLoading = ref(false);
+
+const loadSurvey = async (surveyId: string | string[] | undefined) => {
+  const currentId = Array.isArray(surveyId) ? surveyId[0] : surveyId;
+  if (!currentId) {
+    store.resetComs();
+    isLoading.value = false;
+    return;
+  }
+
+  isLoading.value = true;
+  try {
+    const res = await store.getCurComs(Number(currentId));
     if (res) {
       restoreComponentStatus(res.coms, componentMap);
       store.setStore(res as SurveyDBReturnData);
+    } else {
+      store.resetComs();
     }
-  });
-}
+  } finally {
+    isLoading.value = false;
+  }
+};
+
+watch(
+  () => route.params.id,
+  (surveyId) => {
+    loadSurvey(surveyId as string | string[] | undefined);
+  },
+  { immediate: true },
+);
 </script>
 
 <style scoped lang="scss">
