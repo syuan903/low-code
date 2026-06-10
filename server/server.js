@@ -31,7 +31,13 @@ app.get("/api/getQuiz/:id", (req, res) => {
 // 存储答案
 app.post("/api/submitAnswers", (req, res) => {
   const { quizId, answers: userAnswers } = req.body;
-  answers[quizId] = userAnswers;
+  if (!answers[quizId]) {
+    answers[quizId] = [];
+  }
+  answers[quizId].push({
+    submittedAt: new Date().toISOString(),
+    answers: userAnswers,
+  });
   console.table(answers);
   res.status(200).send({ message: "Answers submitted" });
 });
@@ -77,6 +83,19 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
 // 提供静态资源服务
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-app.listen(3001, () => {
-  console.log("server is running at 3001");
-});
+if (require.main === module) {
+  app.listen(3001, () => {
+    console.log("server is running at 3001");
+  });
+}
+
+module.exports = {
+  app,
+  getSubmittedAnswers(quizId) {
+    return answers[quizId] || [];
+  },
+  resetForTest() {
+    quizzes = {};
+    answers = {};
+  },
+};
