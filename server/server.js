@@ -12,6 +12,7 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true })); // 允许最�
 
 let quizzes = {}; // 存储问题
 let answers = {}; // 存储答案
+const uploadDir = path.join(__dirname, "uploads");
 
 // 针对在线答题功能，提供3个新的接口
 // 存储问卷
@@ -31,7 +32,10 @@ app.get("/api/getQuiz/:id", (req, res) => {
 // 存储答案
 app.post("/api/submitAnswers", (req, res) => {
   const { quizId, answers: userAnswers } = req.body;
-  answers[quizId] = userAnswers;
+  if (!answers[quizId]) {
+    answers[quizId] = [];
+  }
+  answers[quizId].push(userAnswers);
   console.table(answers);
   res.status(200).send({ message: "Answers submitted" });
 });
@@ -41,13 +45,12 @@ const storage = multer.diskStorage({
   // 上传的文件要存储到哪里
   destination: function (req, file, cb) {
     // 上传的文件夹路径，需要在项目根目录下创建 uploads 子文件夹
-    const uploadDir = path.join(__dirname, "uploads");
     // 如果 uploads 子文件夹不存在，则创建它
     if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir);
+      fs.mkdirSync(uploadDir, { recursive: true });
     }
     // 上传的文件夹路径
-    cb(null, "uploads");
+    cb(null, uploadDir);
   },
   // 上传的文件名字如何命名
   filename: function (req, file, cb) {
@@ -75,8 +78,12 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
 });
 
 // 提供静态资源服务
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/uploads", express.static(uploadDir));
 
-app.listen(3001, () => {
-  console.log("server is running at 3001");
-});
+if (require.main === module) {
+  app.listen(3001, () => {
+    console.log("server is running at 3001");
+  });
+}
+
+module.exports = { app, quizzes, answers, uploadDir };
