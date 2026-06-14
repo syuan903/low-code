@@ -7,6 +7,16 @@ const MONGO_DB = process.env.MONGO_DB || "survey";
 let client; // MongoClient 实例
 let db; // 已连接的数据库实例
 
+export function redactMongoUrl(mongoUrl) {
+  try {
+    const parsed = new URL(mongoUrl);
+    const path = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname : "";
+    return `${parsed.protocol}//${parsed.host}${path}`;
+  } catch (error) {
+    return "[invalid MongoDB URL]";
+  }
+}
+
 /**
  * 连接数据库，返回 db 实例。
  * 多次调用只会建立一次连接。
@@ -16,7 +26,7 @@ export async function connectDB() {
   client = new MongoClient(MONGO_URL);
   await client.connect();
   db = client.db(MONGO_DB);
-  console.log(`MongoDB 已连接：${MONGO_URL} / ${MONGO_DB}`);
+  console.log(`MongoDB 已连接：${redactMongoUrl(MONGO_URL)} / ${MONGO_DB}`);
   return db;
 }
 
