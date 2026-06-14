@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { redactMongoUrl } from "../db/mongo.js";
+import { redactMongoUrl } from "../db/redactMongoUrl.js";
 
 test("redactMongoUrl removes credentials and query parameters", () => {
   const redacted = redactMongoUrl(

@@ -1,4 +1,5 @@
 import { MongoClient } from "mongodb";
+import { redactMongoUrl } from "./redactMongoUrl.js";
 
 // MongoDB 连接配置（从环境变量读取）
 const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017";
@@ -6,16 +7,6 @@ const MONGO_DB = process.env.MONGO_DB || "survey";
 
 let client; // MongoClient 实例
 let db; // 已连接的数据库实例
-
-export function redactMongoUrl(mongoUrl) {
-  try {
-    const parsed = new URL(mongoUrl);
-    const path = parsed.pathname && parsed.pathname !== "/" ? parsed.pathname : "";
-    return `${parsed.protocol}//${parsed.host}${path}`;
-  } catch (error) {
-    return "[invalid MongoDB URL]";
-  }
-}
 
 /**
  * 连接数据库，返回 db 实例。
