@@ -8,6 +8,7 @@
           <el-button type="danger" @click="gobackHandle">返回</el-button>
           <el-button type="success" @click="genQuiz">生成在线问卷</el-button>
           <el-button type="warning" @click="genPDF">生成本地PDF</el-button>
+          <el-button type="primary" :icon="DataAnalysis" @click="aiVisible = !aiVisible">AI结果分析</el-button>
         </div>
         <!-- 题目数量 -->
         <div class="mr-15">
@@ -30,6 +31,23 @@
       </div>
     </template>
   </el-dialog>
+
+  <!-- AI 结果分析右侧抽屉 -->
+  <transition name="ai-fade">
+    <div v-if="aiVisible" class="ai-drawer-mask no-print" @click="aiVisible = false"></div>
+  </transition>
+  <transition name="ai-slide">
+    <AiChatPanel
+      v-if="aiVisible"
+      class="ai-drawer no-print"
+      title="AI 结果分析"
+      :messages="aiMessages"
+      :loading="aiLoading"
+      placeholder="询问答卷结果，例如：大家最关注什么？"
+      @send="handleAnalyze"
+      @close="aiVisible = false"
+    />
+  </transition>
 </template>
 
 <script setup lang="ts">
@@ -48,6 +66,9 @@ import { computed ,ref} from "vue";
 import { componentMap } from "@/configs/compontentMap";
 import { v4 as uuidv4 } from 'uuid';
 import { ElMessage } from 'element-plus';
+import AiChatPanel from '@/components/AI/AiChatPanel.vue';
+import { DataAnalysis } from '@element-plus/icons-vue';
+import type { ChatMessage } from '@/types';
 
 const dialogVisible = ref(false);
 
@@ -125,6 +146,30 @@ const copyLink = () => {
   navigator.clipboard.writeText(quizLink.value);
   ElMessage.success('在线答题的链接已复制');
 };
+
+// ===== AI 结果分析 =====
+const aiVisible = ref(false); // 面板显隐
+const aiLoading = ref(false); // 请求中
+const aiMessages = ref<ChatMessage[]>([]); // 对话消息列表
+
+// 发送分析问题：调用 /api/ai/analyze（基于该问卷答卷的 RAG 分析）
+const handleAnalyze = async (text: string) => {
+  aiMessages.value.push({ role: 'user', content: text });
+  aiLoading.value = true;
+  try {
+    const resp = await fetch('/api/ai/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ surveyId: id, question: text }),
+    });
+    const data = await resp.json();
+    aiMessages.value.push({ role: 'assistant', content: data.reply || '暂无分析结果。' });
+  } catch (err) {
+    aiMessages.value.push({ role: 'assistant', content: '抱歉，分析服务暂时不可用，请稍后再试。' });
+  } finally {
+    aiLoading.value = false;
+  }
+};
 </script>
 
 <style scoped lang="scss">
@@ -150,6 +195,42 @@ const copyLink = () => {
   border-radius: var(--border-radius-lg);
   background: var(--white);
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.1);
+}
+// AI 结果分析抽屉遮罩
+.ai-drawer-mask {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  z-index: 2000;
+}
+// AI 结果分析右侧全高抽屉
+.ai-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 420px;
+  max-width: 90vw;
+  height: 100vh;
+  z-index: 2001;
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.18);
+}
+// 遮罩淡入淡出
+.ai-fade-enter-active,
+.ai-fade-leave-active {
+  transition: opacity 0.28s ease;
+}
+.ai-fade-enter-from,
+.ai-fade-leave-to {
+  opacity: 0;
+}
+// 抽屉滑入滑出
+.ai-slide-enter-active,
+.ai-slide-leave-active {
+  transition: transform 0.32s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.ai-slide-enter-from,
+.ai-slide-leave-to {
+  transform: translateX(100%);
 }
 
 @media print {

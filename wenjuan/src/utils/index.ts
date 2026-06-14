@@ -200,3 +200,5 @@ export * from './useUpdateStatus'
 export * from './hooks'
 
 export * from './db'
+
+export * from './applyOperations'
