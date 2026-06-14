@@ -2,7 +2,8 @@ import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { Document } from "@langchain/core/documents";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { createChatModel, createEmbeddings } from "./llm.js";
-import { surveys, answers } from "../db/mongo.js";
+import { surveys, answers, quizzes } from "../db/mongo.js";
+import { buildAnswerQuizIdFilter } from "./answerQuery.js";
 
 /**
  * 把单份答卷转换成可读的文本片段，便于向量化检索。
@@ -74,9 +75,16 @@ export async function analyzeSurvey({ surveyId, question }) {
     const id = Number(surveyId);
     // 1. 拉取问卷与答卷
     const survey = await surveys().findOne({ id });
-    // quizId 在种子/提交时可能为数字或字符串，这里做兼容查询
+    const linkedQuizzes = await quizzes()
+      .find({ surveyId: id }, { projection: { _id: 0, id: 1 } })
+      .toArray();
+    const quizIdFilter = buildAnswerQuizIdFilter(
+      id,
+      linkedQuizzes.map((quiz) => quiz.id)
+    );
+    // quizId 在种子、旧数据和在线发布流程中可能是数字、字符串或 uuid
     const answerDocs = await answers()
-      .find({ $or: [{ quizId: id }, { quizId: String(id) }] })
+      .find(quizIdFilter)
       .toArray();
 
     if (!answerDocs || answerDocs.length === 0) {

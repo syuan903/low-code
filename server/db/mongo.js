@@ -1,4 +1,5 @@
 import { MongoClient } from "mongodb";
+import { redactMongoUrl } from "./redactMongoUrl.js";
 
 // MongoDB 连接配置（从环境变量读取）
 const MONGO_URL = process.env.MONGO_URL || "mongodb://localhost:27017";
@@ -16,7 +17,7 @@ export async function connectDB() {
   client = new MongoClient(MONGO_URL);
   await client.connect();
   db = client.db(MONGO_DB);
-  console.log(`MongoDB 已连接：${MONGO_URL} / ${MONGO_DB}`);
+  console.log(`MongoDB 已连接：${redactMongoUrl(MONGO_URL)} / ${MONGO_DB}`);
   return db;
 }
 

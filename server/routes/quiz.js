@@ -16,10 +16,15 @@ const router = express.Router();
 // 存储在线问卷（id 为前端传来的 uuid 字符串），使用 upsert
 router.post("/api/saveQuiz", async (req, res) => {
   try {
-    const { id, quizData } = req.body;
+    const { id, quizData, surveyId } = req.body;
+    const numericSurveyId = Number(surveyId);
+    const quizDoc = { id, quizData };
+    if (Number.isFinite(numericSurveyId) && numericSurveyId > 0) {
+      quizDoc.surveyId = numericSurveyId;
+    }
     await quizzes().updateOne(
       { id },
-      { $set: { id, quizData } },
+      { $set: quizDoc },
       { upsert: true }
     );
     res.status(200).send({ message: "Quiz saved" });
