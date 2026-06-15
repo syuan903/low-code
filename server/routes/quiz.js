@@ -3,7 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { quizzes, answers } from "../db/mongo.js";
+import { quizzes as getQuizzes, answers as getAnswers } from "../db/mongo.js";
 
 // ESM 中获取当前文件目录
 const __filename = fileURLToPath(import.meta.url);
@@ -11,15 +11,34 @@ const __dirname = path.dirname(__filename);
 // uploads 目录位于 server 根目录下
 const uploadDir = path.join(__dirname, "..", "uploads");
 
+function normalizeSurveyId(surveyId) {
+  const numericSurveyId = Number(surveyId);
+  return Number.isFinite(numericSurveyId) ? numericSurveyId : undefined;
+}
+
+export function createQuizRouter({
+  quizzes = getQuizzes,
+  answers = getAnswers,
+} = {}) {
 const router = express.Router();
 
 // 存储在线问卷（id 为前端传来的 uuid 字符串），使用 upsert
 router.post("/api/saveQuiz", async (req, res) => {
   try {
-    const { id, quizData } = req.body;
+    const { id, quizData, surveyId } = req.body;
+    if (!id || !quizData) {
+      return res.status(400).send({ message: "缺少问卷参数" });
+    }
+
+    const normalizedSurveyId = normalizeSurveyId(surveyId);
+    const quizDoc = { id, quizData };
+    if (normalizedSurveyId !== undefined) {
+      quizDoc.surveyId = normalizedSurveyId;
+    }
+
     await quizzes().updateOne(
       { id },
-      { $set: { id, quizData } },
+      { $set: quizDoc },
       { upsert: true }
     );
     res.status(200).send({ message: "Quiz saved" });
@@ -32,7 +51,10 @@ router.post("/api/saveQuiz", async (req, res) => {
 router.get("/api/getQuiz/:id", async (req, res) => {
   try {
     const doc = await quizzes().findOne({ id: req.params.id });
-    res.status(200).send(doc ? doc.quizData : undefined);
+    if (!doc) {
+      return res.status(404).send({ message: "问卷不存在或尚未生成" });
+    }
+    res.status(200).send(doc.quizData);
   } catch (error) {
     res.status(500).send({ message: "获取问卷失败" });
   }
@@ -42,11 +64,25 @@ router.get("/api/getQuiz/:id", async (req, res) => {
 router.post("/api/submitAnswers", async (req, res) => {
   try {
     const { quizId, answers: userAnswers } = req.body;
-    await answers().insertOne({
+    if (!quizId) {
+      return res.status(400).send({ message: "缺少问卷参数" });
+    }
+
+    const quizDoc = await quizzes().findOne({ id: quizId });
+    if (!quizDoc) {
+      return res.status(404).send({ message: "问卷不存在或尚未生成" });
+    }
+
+    const answerDoc = {
       quizId,
       answers: userAnswers,
       createDate: Date.now(),
-    });
+    };
+    if (quizDoc.surveyId !== undefined) {
+      answerDoc.surveyId = quizDoc.surveyId;
+    }
+
+    await answers().insertOne(answerDoc);
     res.status(200).send({ message: "Answers submitted" });
   } catch (error) {
     res.status(500).send({ message: "提交答卷失败" });
@@ -87,4 +123,7 @@ router.post("/api/upload", upload.single("image"), (req, res) => {
   }
 });
 
-export default router;
+return router;
+}
+
+export default createQuizRouter();

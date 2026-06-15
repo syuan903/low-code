@@ -118,26 +118,34 @@ const genPDF = () => {
 };
 
 // 生成在线问卷
-const genQuiz = () => {
+const genQuiz = async () => {
   // 1. 首先将问卷的数据传递到服务器端，服务器端存储到内存中
-  const id = uuidv4();
-  // 将问卷内容和id传递给服务器
-  fetch('/api/saveQuiz', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      id,
-      quizData: {
-        coms: JSON.stringify(store.coms),
-        surveyCount: store.surveyCount,
+  const quizId = uuidv4();
+  try {
+    // 将问卷内容和id传递给服务器
+    const response = await fetch('/api/saveQuiz', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
-    }),
-  });
-  // 2. 将弹出框显示出来
-  quizLink.value = `${window.location.origin}/quiz/${id}`;
-  dialogVisible.value = true;
+      body: JSON.stringify({
+        id: quizId,
+        surveyId: id,
+        quizData: {
+          coms: JSON.stringify(store.coms),
+          surveyCount: store.surveyCount,
+        },
+      }),
+    });
+    if (!response.ok) {
+      throw new Error('save failed');
+    }
+    // 2. 将弹出框显示出来
+    quizLink.value = `${window.location.origin}/quiz/${quizId}`;
+    dialogVisible.value = true;
+  } catch (error) {
+    ElMessage.error('在线问卷生成失败，请稍后再试');
+  }
 };
 
 // 复制在线答题的链接
