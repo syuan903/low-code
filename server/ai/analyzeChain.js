@@ -2,7 +2,7 @@ import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { Document } from "@langchain/core/documents";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { createChatModel, createEmbeddings } from "./llm.js";
-import { surveys, answers } from "../db/mongo.js";
+import { surveys, answers, quizzes } from "../db/mongo.js";
 
 /**
  * 把单份答卷转换成可读的文本片段，便于向量化检索。
@@ -60,6 +60,33 @@ function extractQuestions(coms) {
   return lines.join("\n");
 }
 
+export function buildSurveyAnswerQuery(surveyId, linkedQuizIds = []) {
+  const id = Number(surveyId);
+  const conditions = [];
+
+  if (Number.isFinite(id)) {
+    conditions.push({ surveyId: id }, { quizId: id }, { quizId: String(id) });
+  } else if (surveyId !== undefined && surveyId !== null) {
+    conditions.push({ quizId: surveyId }, { quizId: String(surveyId) });
+  }
+
+  for (const quizId of linkedQuizIds) {
+    if (quizId !== undefined && quizId !== null && quizId !== "") {
+      conditions.push({ quizId });
+    }
+  }
+
+  const seen = new Set();
+  return {
+    $or: conditions.filter((condition) => {
+      const key = JSON.stringify(condition);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }),
+  };
+}
+
 /**
  * 基于 RAG 的问卷结果分析。
  * 按 surveyId 拉取答卷，构建内存向量库，检索与用户问题相关的答卷片段，
@@ -74,9 +101,17 @@ export async function analyzeSurvey({ surveyId, question }) {
     const id = Number(surveyId);
     // 1. 拉取问卷与答卷
     const survey = await surveys().findOne({ id });
-    // quizId 在种子/提交时可能为数字或字符串，这里做兼容查询
+    const linkedQuizIds = Number.isFinite(id)
+      ? await quizzes()
+        .find({ surveyId: id }, { projection: { _id: 0, id: 1 } })
+        .toArray()
+      : [];
+    const answerQuery = buildSurveyAnswerQuery(
+      surveyId,
+      linkedQuizIds.map((quiz) => quiz.id)
+    );
     const answerDocs = await answers()
-      .find({ $or: [{ quizId: id }, { quizId: String(id) }] })
+      .find(answerQuery)
       .toArray();
 
     if (!answerDocs || answerDocs.length === 0) {
