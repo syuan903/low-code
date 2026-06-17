@@ -3,6 +3,7 @@ import { Document } from "@langchain/core/documents";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { createChatModel, createEmbeddings } from "./llm.js";
 import { surveys, answers, quizzes } from "../db/mongo.js";
+import { buildAnswerLookupQuery } from "../utils/answerLinkage.js";
 
 /**
  * 把单份答卷转换成可读的文本片段，便于向量化检索。
@@ -58,16 +59,6 @@ function extractQuestions(coms) {
     }
   }
   return lines.join("\n");
-}
-
-export function buildAnswerLookupQuery(surveyId, quizIds = []) {
-  const id = Number(surveyId);
-  const linkedQuizIds = [...new Set(quizIds.filter((quizId) => quizId !== undefined && quizId !== null))];
-  const clauses = [{ surveyId: id }, { surveyId: String(id) }, { quizId: id }, { quizId: String(id) }];
-  if (linkedQuizIds.length > 0) {
-    clauses.push({ quizId: { $in: linkedQuizIds } });
-  }
-  return { $or: clauses };
 }
 
 /**

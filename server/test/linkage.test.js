@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildAnswerLookupQuery } from "../ai/analyzeChain.js";
-import { buildAnswerDocument } from "../routes/quiz.js";
+import { buildAnswerDocument, buildAnswerLookupQuery } from "../utils/answerLinkage.js";
 
 test("submitted answers copy the linked surveyId from the quiz document", () => {
   const answerDoc = buildAnswerDocument({

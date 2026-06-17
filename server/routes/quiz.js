@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { quizzes, answers } from "../db/mongo.js";
+import { buildAnswerDocument } from "../utils/answerLinkage.js";
 
 // ESM 中获取当前文件目录
 const __filename = fileURLToPath(import.meta.url);
@@ -12,18 +13,6 @@ const __dirname = path.dirname(__filename);
 const uploadDir = path.join(__dirname, "..", "uploads");
 
 const router = express.Router();
-
-export function buildAnswerDocument({ quizId, userAnswers, quizDoc }) {
-  const doc = {
-    quizId,
-    answers: userAnswers,
-    createDate: Date.now(),
-  };
-  if (quizDoc?.surveyId !== undefined && quizDoc?.surveyId !== null) {
-    doc.surveyId = quizDoc.surveyId;
-  }
-  return doc;
-}
 
 // 存储在线问卷（id 为前端传来的 uuid 字符串），使用 upsert
 router.post("/api/saveQuiz", async (req, res) => {
