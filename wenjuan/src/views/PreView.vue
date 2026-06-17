@@ -120,7 +120,7 @@ const genPDF = () => {
 // 生成在线问卷
 const genQuiz = () => {
   // 1. 首先将问卷的数据传递到服务器端，服务器端存储到内存中
-  const id = uuidv4();
+  const quizId = uuidv4();
   // 将问卷内容和id传递给服务器
   fetch('/api/saveQuiz', {
     method: 'POST',
@@ -128,7 +128,8 @@ const genQuiz = () => {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      id,
+      id: quizId,
+      surveyId: id,
       quizData: {
         coms: JSON.stringify(store.coms),
         surveyCount: store.surveyCount,
@@ -136,7 +137,7 @@ const genQuiz = () => {
     }),
   });
   // 2. 将弹出框显示出来
-  quizLink.value = `${window.location.origin}/quiz/${id}`;
+  quizLink.value = `${window.location.origin}/quiz/${quizId}`;
   dialogVisible.value = true;
 };
 

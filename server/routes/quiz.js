@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { quizzes, answers } from "../db/mongo.js";
+import { buildAnswerDocument } from "../utils/answerLinkage.js";
 
 // ESM 中获取当前文件目录
 const __filename = fileURLToPath(import.meta.url);
@@ -16,10 +17,15 @@ const router = express.Router();
 // 存储在线问卷（id 为前端传来的 uuid 字符串），使用 upsert
 router.post("/api/saveQuiz", async (req, res) => {
   try {
-    const { id, quizData } = req.body;
+    const { id, quizData, surveyId } = req.body;
+    const normalizedSurveyId = Number(surveyId);
+    const doc = { id, quizData };
+    if (Number.isFinite(normalizedSurveyId)) {
+      doc.surveyId = normalizedSurveyId;
+    }
     await quizzes().updateOne(
       { id },
-      { $set: { id, quizData } },
+      { $set: doc },
       { upsert: true }
     );
     res.status(200).send({ message: "Quiz saved" });
@@ -42,11 +48,8 @@ router.get("/api/getQuiz/:id", async (req, res) => {
 router.post("/api/submitAnswers", async (req, res) => {
   try {
     const { quizId, answers: userAnswers } = req.body;
-    await answers().insertOne({
-      quizId,
-      answers: userAnswers,
-      createDate: Date.now(),
-    });
+    const quizDoc = await quizzes().findOne({ id: quizId });
+    await answers().insertOne(buildAnswerDocument({ quizId, userAnswers, quizDoc }));
     res.status(200).send({ message: "Answers submitted" });
   } catch (error) {
     res.status(500).send({ message: "提交答卷失败" });

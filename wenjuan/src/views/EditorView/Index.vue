@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="header">
-      <Header :isEditor="true" :id="Number(id)"/>
+      <Header :isEditor="true" :id="Number(id)" :loading="isLoadingSurvey"/>
     </div>
     <!-- 编辑器主体区域 -->
     <div class="container">
@@ -43,6 +43,7 @@ import RightSide from '@/views/EditorView/RightSide.vue';
 import { restoreComponentStatus } from '@/utils';
 import { componentMap } from '@/configs/compontentMap';
 import {computed, ref} from 'vue';
+import { ElMessage } from 'element-plus';
 import type { SurveyDBReturnData,EditorStore, ChatMessage} from '@/types';
 import { useUpdateStatus, applyOperations, buildCurrentSummary } from "@/utils";
 import AiChatPanel from '@/components/AI/AiChatPanel.vue';
@@ -60,13 +61,21 @@ const currentCom = computed(() => store.coms[store.currentComponentIndex]);
 useUpdateStatus(store,currentCom)
 
 const id = computed(() => (route.params.id ? route.params.id : ''));
+const isLoadingSurvey = ref(Boolean(id.value));
 if (id.value) {
-  store.getCurComs(Number(id.value)).then((res) => {
-    if (res) {
-      restoreComponentStatus(res.coms, componentMap);
-      store.setStore(res as SurveyDBReturnData);
-    }
-  });
+  store.getCurComs(Number(id.value))
+    .then((res) => {
+      if (res) {
+        restoreComponentStatus(res.coms, componentMap);
+        store.setStore(res as SurveyDBReturnData);
+      }
+    })
+    .catch(() => {
+      ElMessage.error('问卷加载失败，请稍后重试');
+    })
+    .finally(() => {
+      isLoadingSurvey.value = false;
+    });
 }
 
 // ===== AI 问卷助手 =====
@@ -92,6 +101,9 @@ const handleSend = async (text: string) => {
     });
     const data = await resp.json();
     if (Array.isArray(data.operations) && data.operations.length) {
+      if (data.operations.some((operation: { op?: string }) => operation?.op === 'reset')) {
+        ElMessage.warning('AI 建议清空问卷，已跳过自动清空；如需重置请使用顶部按钮确认操作');
+      }
       applyOperations(data.operations);
     }
     aiMessages.value.push({ role: 'assistant', content: data.reply || '已处理完成。' });
