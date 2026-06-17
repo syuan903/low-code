@@ -2,7 +2,7 @@ import { MemoryVectorStore } from "langchain/vectorstores/memory";
 import { Document } from "@langchain/core/documents";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { createChatModel, createEmbeddings } from "./llm.js";
-import { surveys, answers } from "../db/mongo.js";
+import { surveys, answers, quizzes } from "../db/mongo.js";
 
 /**
  * 把单份答卷转换成可读的文本片段，便于向量化检索。
@@ -60,6 +60,16 @@ function extractQuestions(coms) {
   return lines.join("\n");
 }
 
+export function buildAnswerLookupQuery(surveyId, quizIds = []) {
+  const id = Number(surveyId);
+  const linkedQuizIds = [...new Set(quizIds.filter((quizId) => quizId !== undefined && quizId !== null))];
+  const clauses = [{ surveyId: id }, { surveyId: String(id) }, { quizId: id }, { quizId: String(id) }];
+  if (linkedQuizIds.length > 0) {
+    clauses.push({ quizId: { $in: linkedQuizIds } });
+  }
+  return { $or: clauses };
+}
+
 /**
  * 基于 RAG 的问卷结果分析。
  * 按 surveyId 拉取答卷，构建内存向量库，检索与用户问题相关的答卷片段，
@@ -74,9 +84,12 @@ export async function analyzeSurvey({ surveyId, question }) {
     const id = Number(surveyId);
     // 1. 拉取问卷与答卷
     const survey = await surveys().findOne({ id });
-    // quizId 在种子/提交时可能为数字或字符串，这里做兼容查询
+    const quizDocs = await quizzes()
+      .find({ $or: [{ surveyId: id }, { surveyId: String(id) }] }, { projection: { _id: 0, id: 1 } })
+      .toArray();
+    const quizIds = quizDocs.map((doc) => doc.id);
     const answerDocs = await answers()
-      .find({ $or: [{ quizId: id }, { quizId: String(id) }] })
+      .find(buildAnswerLookupQuery(id, quizIds))
       .toArray();
 
     if (!answerDocs || answerDocs.length === 0) {

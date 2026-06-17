@@ -10,9 +10,9 @@ export function applyOperations(operations: Operation[]) {
   for (const operation of operations) {
     try {
       switch (operation.op) {
-        // 重置整个画布
+        // 重置整个画布需要用户确认，AI 指令不直接执行此类破坏性操作。
         case 'reset': {
-          store.resetComs()
+          console.warn('AI reset 操作需要用户确认，已跳过：', operation)
           break
         }
         // 在末尾追加一个题目组件

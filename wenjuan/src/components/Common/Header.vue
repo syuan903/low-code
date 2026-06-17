@@ -7,7 +7,7 @@
       <div class="center flex align-items-center space-between pl-15 pr-15">
         <div v-if="isEditor">
           <div v-if="id">
-            <el-button type="warning" size="small" @click="updateSurvey()"
+            <el-button type="warning" size="small" :disabled="loading" @click="updateSurvey()"
               >更新问卷</el-button
             >
           </div>
@@ -17,7 +17,7 @@
           </div>
         </div>
         <div v-if="isEditor">
-          <el-button type="primary" size="small" @click="preview">预览</el-button>
+          <el-button type="primary" size="small" :disabled="loading" @click="preview">预览</el-button>
         </div>
       </div>
       <div class="right flex justify-content-center align-items-center">
@@ -38,7 +38,8 @@ const store = useEditorStore();
 
 const props = defineProps<{
   isEditor: boolean,
-  id?: number
+  id?: number,
+  loading?: boolean
 }>()
 
 const goHome = () => {
@@ -97,6 +98,10 @@ const saveSurvey = () => {
 };
 
 const updateSurvey = () => {
+  if (props.loading) {
+    ElMessage.warning('问卷正在加载，请稍后再更新');
+    return;
+  }
   ElMessageBox.confirm('是否确定更新问卷', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
@@ -123,6 +128,10 @@ const updateSurvey = () => {
 
 // 预览问卷
 const preview = () => {
+  if (props.loading) {
+    ElMessage.warning('问卷正在加载，请稍后再预览');
+    return;
+  }
   ElMessageBox.confirm('预览会自动保存问卷，是否跳转预览？', '提示', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
